@@ -3,6 +3,40 @@ import { db } from "../../db/config.js";
 import { teachers, students, teacherStudents } from "../../db/schema.js";
 import { extractMentionedEmails } from "../../utils/index.js";
 
+/**
+ * Find an existing teacher by email or create a new one if they don't exist
+ * @param teacherEmail - The email of the teacher to find or create
+ * @param tx - Optional transaction object to use for the database operations
+ * @returns Promise<{ teacherId: number }> - The teacher record with teacherId
+ */
+export async function findOrCreateTeacher(
+  teacherEmail: string,
+  tx?: any
+): Promise<{ teacherId: number }> {
+  if (!teacherEmail) {
+    throw new Error("Teacher email is required");
+  }
+
+  const dbClient = tx || db;
+
+  // Try to find existing teacher
+  let teacher = await dbClient
+    .select({ teacherId: teachers.teacherId })
+    .from(teachers)
+    .where(eq(teachers.email, teacherEmail))
+    .then((result: any[]) => result[0]);
+
+  if (!teacher) {
+    // Create teacher if doesn't exist
+    const [newTeacher] = await dbClient
+      .insert(teachers)
+      .values({ email: teacherEmail });
+    teacher = { teacherId: newTeacher.insertId };
+  }
+
+  return teacher;
+}
+
 export async function registerStudents(
   teacherEmail: string,
   studentEmails: string[]
@@ -18,19 +52,7 @@ export async function registerStudents(
   // Start a transaction to ensure data consistency
   await db.transaction(async (tx) => {
     // 1. Find or create the teacher
-    let teacher = await tx
-      .select({ teacherId: teachers.teacherId })
-      .from(teachers)
-      .where(eq(teachers.email, teacherEmail))
-      .then((result) => result[0]);
-
-    if (!teacher) {
-      // Create teacher if doesn't exist
-      const [newTeacher] = await tx
-        .insert(teachers)
-        .values({ email: teacherEmail });
-      teacher = { teacherId: newTeacher.insertId };
-    }
+    const teacher = await findOrCreateTeacher(teacherEmail, tx);
 
     // 2. Find or create students
     const studentIds: number[] = [];
@@ -78,6 +100,7 @@ export async function registerStudents(
 export async function getCommonStudents(
   teacherEmails: string[]
 ): Promise<string[]> {
+  console.log("Teacher Emails:", teacherEmails);
   if (!teacherEmails || teacherEmails.length === 0) {
     throw new Error("At least one teacher email is required");
   }
@@ -172,38 +195,27 @@ export async function getNotificationRecipients(
   // Extract mentioned emails from the notification
   const mentionedEmails = extractMentionedEmails(notificationText);
 
-  // Find the teacher
-  const teacher = await db
-    .select({ teacherId: teachers.teacherId })
-    .from(teachers)
-    .where(eq(teachers.email, teacherEmail))
-    .then((result) => result[0]);
-
-  // If teacher doesn't exist and there are no mentions, return empty array
-  if (!teacher && mentionedEmails.length === 0) {
-    return [];
-  }
+  // Find or create the teacher
+  const teacher = await findOrCreateTeacher(teacherEmail);
 
   const recipients = new Set<string>();
 
-  // Get students registered to this teacher (if teacher exists and is not suspended)
-  if (teacher) {
-    const registeredStudents = await db
-      .select({ email: students.email })
-      .from(students)
-      .innerJoin(
-        teacherStudents,
-        eq(students.studentId, teacherStudents.studentId)
+  // Get students registered to this teacher (teacher now always exists)
+  const registeredStudents = await db
+    .select({ email: students.email })
+    .from(students)
+    .innerJoin(
+      teacherStudents,
+      eq(students.studentId, teacherStudents.studentId)
+    )
+    .where(
+      and(
+        eq(teacherStudents.teacherId, teacher.teacherId),
+        eq(students.isSuspended, 0) // Not suspended
       )
-      .where(
-        and(
-          eq(teacherStudents.teacherId, teacher.teacherId),
-          eq(students.isSuspended, 0) // Not suspended
-        )
-      );
+    );
 
-    registeredStudents.forEach((student) => recipients.add(student.email));
-  }
+  registeredStudents.forEach((student) => recipients.add(student.email));
 
   // Get mentioned students (if they exist and are not suspended)
   if (mentionedEmails.length > 0) {
