@@ -3,12 +3,6 @@ import { db } from "../../db/config.js";
 import { teachers, students, teacherStudents } from "../../db/schema.js";
 import { extractMentionedEmails } from "../../utils/index.js";
 
-/**
- * Find an existing teacher by email or create a new one if they don't exist
- * @param teacherEmail - The email of the teacher to find or create
- * @param tx - Optional transaction object to use for the database operations
- * @returns Promise<{ teacherId: number }> - The teacher record with teacherId
- */
 export async function findOrCreateTeacher(
   teacherEmail: string,
   tx?: any
@@ -20,11 +14,13 @@ export async function findOrCreateTeacher(
   const dbClient = tx || db;
 
   // Try to find existing teacher
-  let teacher = await dbClient
+  let teacher;
+  const teacherRecord = await dbClient
     .select({ teacherId: teachers.teacherId })
     .from(teachers)
-    .where(eq(teachers.email, teacherEmail))
-    .then((result: any[]) => result[0]);
+    .where(eq(teachers.email, teacherEmail));
+
+  teacher = teacherRecord[0];
 
   if (!teacher) {
     // Create teacher if doesn't exist
@@ -114,12 +110,11 @@ export async function getCommonStudents(
     .from(teachers)
     .where(inArray(teachers.email, teacherEmails));
 
-  // If no valid teachers found, return empty array
-  if (teacherRecords.length === 0) {
+  // If any teacher doesn't exist, return empty array
+  // because students must be registered to ALL teachers
+  if (teacherRecords.length !== teacherEmails.length) {
     return [];
   }
-
-  // Continue with valid teachers only (ignore invalid/non-existent ones)
 
   const teacherIds = teacherRecords.map((t) => t.teacherId);
 
