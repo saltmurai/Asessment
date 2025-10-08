@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
@@ -15,6 +15,17 @@ async function bootstrap() {
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
+      },
+      exceptionFactory: (errors) => {
+        const messages = errors
+          .map((error) => {
+            if (error.constraints) {
+              return Object.values(error.constraints).join('. ');
+            }
+            return '';
+          })
+          .filter((msg) => msg !== '');
+        return new BadRequestException(messages.join(' '));
       },
     }),
   );

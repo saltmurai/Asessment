@@ -7,6 +7,7 @@ import { EntityManager } from 'typeorm';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { StudentRepository } from '../db/repositories/student.repository';
 import { TeacherRepository } from '../db/repositories/teacher.repository';
+import { TeachersService } from '../teachers/teachers.service';
 import { Student } from '../db/models/student.entity';
 import { extractMentionedEmails } from '../utils';
 
@@ -15,31 +16,10 @@ export class StudentsService {
   constructor(
     private readonly studentRepository: StudentRepository,
     private readonly teacherRepository: TeacherRepository,
+    private readonly teachersService: TeachersService,
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
   ) {}
-
-  async findOrCreateTeacher(
-    teacherEmail: string,
-    entityManager?: EntityManager,
-  ): Promise<{ teacherId: number }> {
-    if (!teacherEmail) {
-      throw new BadRequestException('Teacher email is required');
-    }
-
-    const teacherRepo = this.teacherRepository.getRepository(entityManager);
-
-    let teacher = await teacherRepo.findOne({
-      where: { email: teacherEmail },
-    });
-
-    if (!teacher) {
-      teacher = teacherRepo.create({ email: teacherEmail });
-      teacher = await teacherRepo.save(teacher);
-    }
-
-    return { teacherId: teacher.teacherId };
-  }
 
   async registerStudents(
     teacherEmail: string,
@@ -55,7 +35,7 @@ export class StudentsService {
 
     await this.entityManager.transaction(async (transactionalEntityManager) => {
       // 1. Find or create the teacher
-      const teacher = await this.findOrCreateTeacher(
+      const teacher = await this.teachersService.findOrCreateTeacher(
         teacherEmail,
         transactionalEntityManager,
       );
@@ -119,11 +99,8 @@ export class StudentsService {
       throw new BadRequestException('At least one teacher email is required');
     }
 
-    // First, get the teachers for the provided emails
     const teachers = await this.teacherRepository.findByEmails(teacherEmails);
 
-    // If any teacher doesn't exist, return empty array
-    // because students must be registered to ALL teachers
     if (teachers.length !== teacherEmails.length) {
       return [];
     }
@@ -144,10 +121,6 @@ export class StudentsService {
   }
 
   async suspendStudent(studentEmail: string): Promise<void> {
-    if (!studentEmail) {
-      throw new BadRequestException('Student email is required');
-    }
-
     const student = await this.studentRepository.findByEmail(studentEmail);
 
     if (!student) {
@@ -163,7 +136,8 @@ export class StudentsService {
   ): Promise<string[]> {
     const mentionedEmails = extractMentionedEmails(notificationText);
 
-    const teacher = await this.findOrCreateTeacher(teacherEmail);
+    const teacher =
+      await this.teachersService.findOrCreateTeacher(teacherEmail);
 
     const recipients = new Set<string>();
 
@@ -183,7 +157,6 @@ export class StudentsService {
       mentionedStudents.forEach((student) => recipients.add(student.email));
     }
 
-    // Convert Set to Array and return
     return Array.from(recipients);
   }
 }
