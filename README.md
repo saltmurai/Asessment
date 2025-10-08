@@ -12,7 +12,7 @@ A NestJS-based student management system with MySQL database, fully containerize
 
 ### 1. Environment Setup
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory following `.env.example`:
 
 ```bash
 # Database Configuration
@@ -52,18 +52,7 @@ docker-compose down -v
 
 ### Using Docker Only (Manual Database Setup)
 
-1. **Start MySQL container:**
-
-   ```bash
-   docker run -d \
-     --name mysql-db \
-     -e MYSQL_ROOT_PASSWORD=password \
-     -e MYSQL_DATABASE=student_manage \
-     -p 3306:3306 \
-     mysql:8.0
-   ```
-
-2. **Build and run the app:**
+1. **Build and run the app:**
    ```bash
    docker build -t student-app .
    docker run -p 3000:3000 --env-file .env student-app
@@ -101,20 +90,5 @@ The application uses MySQL 8.0 with the following features:
 - TypeORM with entity synchronization in development
 - Health checks ensure database is ready before app starts
 
-## API Endpoints
-
-- `GET /students` - Get all students
-- `GET /students/:id` - Get student by ID
-- `POST /students` - Create new student
-- `PUT /students/:id` - Update student
-- `DELETE /students/:id` - Delete student
-
-## Development Notes
-
-- The app uses pnpm for package management
-- TypeScript with NestJS framework
-- Docker multi-stage builds for optimized production images
-- Health checks and proper container orchestration
-- Non-root user in production container for security
 
 App runs on `http://localhost:3000`
