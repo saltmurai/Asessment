@@ -82,15 +82,21 @@ export class StudentsService {
         teacherEntity.students.map((s) => s.studentId),
       );
 
-      // Add only new students to the relationship
-      const newStudents = students.filter(
-        (student) => !existingStudentIds.has(student.studentId),
+      // Check if any students are already registered
+      const alreadyRegistered = students.filter((student) =>
+        existingStudentIds.has(student.studentId),
       );
 
-      if (newStudents.length > 0) {
-        teacherEntity.students.push(...newStudents);
-        await teacherRepo.save(teacherEntity);
+      if (alreadyRegistered.length > 0) {
+        const alreadyRegisteredEmails = alreadyRegistered.map((s) => s.email);
+        throw new BadRequestException(
+          `Students already registered to this teacher: ${alreadyRegisteredEmails.join(', ')}`,
+        );
       }
+
+      // Add students to the relationship
+      teacherEntity.students.push(...students);
+      await teacherRepo.save(teacherEntity);
     });
   }
 

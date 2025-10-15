@@ -73,6 +73,7 @@ pnpm test
 # Run e2e tests
 pnpm test:e2e
 ```
+![Test](./image.png)
 
 ### Production Build
 

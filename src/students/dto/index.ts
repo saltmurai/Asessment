@@ -38,9 +38,11 @@ export class RetrieveNotificationsDto {
 }
 
 export class CommonStudentsQueryDto {
-  @Transform(
-    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
-  )
+  @Transform(({ value }) => {
+    const teachers = Array.isArray(value) ? value : [value];
+    // Remove duplicates
+    return [...new Set(teachers)] as string[];
+  })
   @IsArray({ message: 'Teacher parameter must be an array of email addresses' })
   @ArrayMinSize(1, { message: 'At least one teacher email is required' })
   @IsEmail(
