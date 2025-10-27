@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StudentsModule } from './students/students.module';
+import { ClassesModule } from './classes/classes.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -23,6 +24,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       }),
     }),
     StudentsModule,
+    ClassesModule,
   ],
 })
 export class AppModule {}
